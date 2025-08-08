@@ -1,44 +1,52 @@
-# Simulação de Captura de Estado Global com Clocks de Lamport
+Simulação e Análise de Algoritmos de Eleição em Sistemas Distribuídos: Bully e Anel
 
-Este projeto é uma implementação em Python de uma simulação de sistema distribuído, desenvolvida para a disciplina de **Sistemas Distribuídos** do Instituto Federal da Bahia (IFBA) - Campus Santo Antônio de Jesus.
+Este projeto é uma implementação em Python de uma simulação de sistema distribuído, desenvolvida para a disciplina de Sistemas Distribuídos do Instituto Federal da Bahia (IFBA) - Campus Santo Antônio de Jesus.
 
-O objetivo principal é aplicar e visualizar o funcionamento de algoritmos fundamentais para a computação distribuída, especificamente os **Relógios Lógicos de Lamport** e o algoritmo de **Captura de Estado Global de Chandy-Lamport**.
+O objetivo principal é aplicar e visualizar o funcionamento de dois algoritmos fundamentais para a computação distribuída: o Algoritmo de Eleição Bully e o Algoritmo de Eleição em Anel. A simulação permite observar como cada algoritmo se comporta frente à ausência de um coordenador e garante a eleição de um novo líder em diferentes cenários de falha.
 
-## 1. Visão Geral do Projeto
+1. Visão Geral do Projeto
 
-A simulação consiste em três processos que se comunicam concorrentemente através de sockets. Cada processo mantém um estado local simples (um contador) e um relógio lógico de Lamport para ordenar os eventos de forma causal.
+A simulação consiste em um conjunto de processos que se comunicam concorrentemente através de sockets. Cada processo possui um identificador único (ID), um estado local simples (um contador) e um mecanismo para detectar a falha do coordenador. Quando a falha é detectada, um dos dois algoritmos de eleição é acionado para escolher um novo líder.
 
-O sistema demonstra como é possível capturar um *snapshot* global consistente (o estado de todos os processos e as mensagens em trânsito nos canais de comunicação) sem interromper a execução normal do sistema, conforme o algoritmo de Chandy-Lamport.
+2. Conceitos Implementados
 
-## 2. Conceitos Implementados
+2.1. Algoritmo de Eleição Bully
 
-### 2.1. Relógios Lógicos de Lamport
+Este algoritmo se baseia nos IDs dos processos. Quando um processo detecta a falha do coordenador, ele inicia a eleição:
 
-Para garantir uma ordenação causal dos eventos, cada processo implementa um relógio lógico que segue duas regras fundamentais:
+    Envia uma mensagem de ELEIÇÃO para todos os processos com IDs maiores que o seu.
 
-1.  **Incremento Local:** Antes de qualquer evento (geração interna ou envio de mensagem), o relógio do processo é incrementado.
-2.  **Atualização no Recebimento:** Ao receber uma mensagem, o processo ajusta seu relógio para `max(relógio_local, timestamp_recebido) + 1`.
+    Se nenhum processo de ID maior responder, ele se declara o novo coordenador e envia uma mensagem de COORDENADOR para todos os processos.
 
-### 2.2. Algoritmo de Captura de Estado de Chandy-Lamport
+    Se um processo de ID maior responder com uma mensagem de OK, o processo que iniciou a eleição desiste e aguarda a proclamação de um novo líder.
 
-O núcleo da simulação é a implementação do algoritmo de snapshot, que opera da seguinte forma:
+2.2. Algoritmo de Eleição em Anel
 
-1.  **Iniciação:** Um processo (o coordenador) inicia o snapshot, gravando seu próprio estado e enviando uma mensagem especial de **marcador** (*marker*) para todos os outros processos.
-2.  **Gravação de Estado:** Ao receber um marcador pela primeira vez, um processo imediatamente grava seu estado local e retransmite o marcador para seus pares.
-3.  **Captura de Mensagens em Trânsito:** Após gravar seu estado, um processo começa a registrar todas as mensagens que chegam de canais dos quais ainda não recebeu um marcador. Essas mensagens representam o estado do canal (mensagens "em voo").
-4.  **Finalização:** Quando um processo recebe marcadores de todos os canais, sua parte do snapshot está completa. Ele envia seu estado local e os estados dos canais capturados para o coordenador, que consolida e exibe o estado global consistente.
+Este algoritmo utiliza a passagem de um token em um anel virtual de processos, ordenados por seus IDs.
 
-## 3. Estrutura do Código
+    Um processo que detecta a falha do coordenador cria um token de ELEIÇÃO contendo seu próprio ID e o passa para o próximo processo no anel.
 
-O projeto está organizado de forma modular para separar as responsabilidades, utilizando threads para simular o paralelismo conforme sugerido na atividade:
+    Cada processo que recebe o token adiciona seu ID à lista e o repassa.
 
--   `main.py`: Arquivo principal que inicializa os três processos, define as portas e inicia a simulação, incluindo o gatilho para o snapshot.
--   `process.py`: Contém a classe `Process`, que encapsula toda a lógica de um processo distribuído, incluindo o servidor de sockets, a geração de eventos, o relógio de Lamport e a implementação completa do algoritmo de Chandy-Lamport.
--   `utils.py`: Módulo utilitário que contém a implementação da classe `LamportClock` e a função de log.
+    Quando o token retorna ao iniciador, ele contém a lista de todos os processos ativos. O iniciador escolhe o maior ID da lista como novo coordenador e envia uma mensagem de COORDENADOR pelo anel para anunciá-lo.
 
-## 4. Como Executar
+3. Estrutura do Código
 
-Para executar a simulação, basta rodar o arquivo `main.py` em um ambiente com Python 3.
+O projeto está organizado de forma modular, utilizando threads para simular o paralelismo:
 
-```bash
+    main.py: Arquivo principal que inicializa os processos, define a topologia e executa os cenários de simulação.
+
+    process.py: Contém a classe Process, que encapsula toda a lógica de um processo distribuído, incluindo o servidor de sockets, a detecção de falhas e as implementações completas dos algoritmos Bully e Anel.
+
+    utils.py: Módulo utilitário com funções auxiliares como o registro de eventos (log_event).
+
+4. Como Executar
+
+Para executar a simulação, basta rodar o arquivo main.py em um ambiente com Python 3. O programa solicitará a escolha entre dois cenários:
+Bash
+
 python main.py
+
+    Opção 1 (Bully): Simula a falha e o retorno do coordenador. O algoritmo Bully é ativado para eleger um novo líder.
+
+    Opção 2 (Anel): Simula a falha de múltiplos processos de maior ID, e o algoritmo de Anel é ativado para eleger um novo coordenador entre os processos restantes.
